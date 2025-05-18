@@ -1,0 +1,12 @@
+FROM flink:1.16
+
+USER root
+
+RUN apt-get update && apt-get install -y python3 python3-pip
+
+RUN pip install apache-beam[text]==2.54.0 -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn && pip install textblob -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn && python3 -m textblob.download_corpora
+
+RUN apt-get install -y docker.io
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["taskmanager"]

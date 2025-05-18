@@ -1,0 +1,10 @@
+FROM openjdk:11-jre-slim
+
+WORKDIR /jobserver
+
+# 复制 flink-job-server jar
+COPY beam-runners-flink-1.16-job-server-2.52.0.jar /jobserver/flink-job-server.jar
+
+EXPOSE 8099
+
+ENTRYPOINT ["java", "-jar", "flink-job-server.jar", "--flink-master", "flink-jobmanager:8081", "--job-port", "8099"]

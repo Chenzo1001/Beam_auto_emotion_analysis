@@ -1,0 +1,91 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - 2181:2181
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - 9092:9092
+    depends_on:
+      - zookeeper
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - kafka
+    entrypoint: ["/bin/bash", "-c"]
+    command: >
+      "
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic comments --partitions 1 --replication-factor 1;
+      sleep infinity;
+      "
+
+  flink-jobmanager:
+    image: flink:1.16
+    command: jobmanager
+    ports:
+      - 8081:8081
+    environment:
+      JOB_MANAGER_RPC_ADDRESS: flink-jobmanager
+      FLINK_PROPERTIES: |
+        restart-strategy: fixed-delay
+        restart-strategy.fixed-delay.attempts: 3
+        restart-strategy.fixed-delay.delay: 5 s
+        jobmanager.rpc.address: flink-jobmanager
+        jobmanager.memory.process.size: 1600m
+        taskmanager.memory.process.size: 1728m
+        blob.server.port: 6124
+        query.server.port: 6125
+
+  flink-taskmanager:
+    image: flink-taskmanager-python:1.16
+    command: taskmanager
+    depends_on:
+      - flink-jobmanager
+    environment:
+      TASK_MANAGER_NUMBER_OF_TASK_SLOTS: 2 
+      FLINK_PROPERTIES: |
+        restart-strategy: fixed-delay
+        restart-strategy.fixed-delay.attempts: 3
+        restart-strategy.fixed-delay.delay: 5 s
+        jobmanager.rpc.address: flink-jobmanager
+        jobmanager.memory.process.size: 1600m
+        taskmanager.memory.process.size: 1728m
+        blob.server.port: 6124
+        query.server.port: 6125
+        python.docker.enabled: false
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  flink-jobserver:
+    build:
+      context: .
+      dockerfile: Dockerfile.flink-jobserver
+    ports:
+      - "8099:8099"
+    depends_on:
+      - flink-jobmanager
+
+  producer:
+    build: .
+    entrypoint: python
+    command: ["producer.py"]
+    depends_on:
+      - kafka-init
+
+  beam:
+    build: .
+    entrypoint: python
+    command: ["beam_pipeline.py"]
+    depends_on:
+      - kafka-init
+      - flink-taskmanager

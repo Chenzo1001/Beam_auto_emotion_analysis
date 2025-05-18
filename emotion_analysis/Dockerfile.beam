@@ -1,0 +1,12 @@
+FROM apache/beam_python3.10_sdk:latest
+
+WORKDIR /app
+
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+ENV PATH=$JAVA_HOME/bin:$PATH
+
+COPY requirements.txt /app/
+
+RUN echo "deb http://deb.debian.org/debian bullseye main contrib non-free" >/etc/apt/sources.list && apt-get update && apt-get install -y openjdk-11-jdk && pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn && python -m textblob.download_corpora
+
+COPY beam_pipeline.py kafka/ /app/
